@@ -6,5 +6,9 @@ o quê e respondem de dentro do app.
 
 - Visão do produto e decisões: [docs/VISAO.md](docs/VISAO.md)
 - Arquitetura proposta: [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
+- Como configurar e rodar: [docs/SETUP.md](docs/SETUP.md)
 
-Status: fase de definição. Uso interno, Gmail primeiro, web, custo zero.
+Uso interno, Google Workspace, web, custo zero.
+
+Status: login com Google, conexão de caixas e configurações prontos.
+Próximo passo: sincronizar os emails.

@@ -66,7 +66,7 @@ sua.
 
 | Tema | Decisão |
 |---|---|
-| Provedor | Gmail apenas, por enquanto |
+| Provedor | Gmail (Google Workspace com domínio próprio) |
 | Plataforma | Web |
 | Público | Uso interno da empresa (não é SaaS por ora) |
 | Custo | Zero ou o mais próximo disso |

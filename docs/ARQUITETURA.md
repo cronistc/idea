@@ -25,7 +25,7 @@ verificação do Google e auditoria de segurança paga. Para uso interno há doi
 caminhos gratuitos:
 
 1. **Google Workspace (email da empresa):** criar o app OAuth como **Interno**.
-   Sem verificação, sem limite de usuários. **Recomendado.**
+   Sem verificação, sem limite de usuários. **Escolhido: a empresa usa Workspace.**
 2. **Contas @gmail.com comuns:** app em modo **Teste**, até 100 usuários, mas o
    acesso expira a cada 7 dias e cada pessoa precisa reconectar.
 
@@ -64,9 +64,9 @@ Filtro        id, workspace_id, tipo, valor, acao
 
 ## Próximos passos
 
-1. Criar projeto no Google Cloud e o app OAuth (Interno, se for Workspace)
-2. Estrutura do projeto Next.js + Prisma + banco
-3. Login com Google e conexão de uma caixa
+1. ~~Estrutura do projeto Next.js + Prisma + banco~~ ✅
+2. ~~Login com Google e conexão de caixas~~ ✅
+3. Criar o app OAuth no Google Cloud (ver [SETUP.md](SETUP.md))
 4. Sincronização e caixa de entrada unificada (só leitura)
 5. Responder, tags, status, responsável
 6. Comentários internos, presença e filtros

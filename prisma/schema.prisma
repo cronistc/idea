@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Modo {
+  CAIXA_UNICA // uma caixa, atendentes internos respondem por ela
+  CONTAS_CONECTADAS // cada membro conecta o próprio Gmail
+}
+
+enum RespostaPor {
+  QUEM_RESPONDEU // sai do endereço de quem clicou em responder
+  QUEM_RECEBEU // sai do endereço que recebeu o email
+  SO_DESTINATARIO // só quem recebeu responde; os outros veem e comentam
+}
+
+enum Papel {
+  ADMIN
+  MEMBRO
+}
+
+enum Status {
+  ABERTA
+  PENDENTE
+  RESOLVIDA
+}
+
+model Workspace {
+  id          String      @id @default(cuid())
+  nome        String
+  modo        Modo        @default(CONTAS_CONECTADAS)
+  respostaPor RespostaPor @default(QUEM_RESPONDEU)
+  criadoEm    DateTime    @default(now())
+
+  membros   Membro[]
+  caixas    Caixa[]
+  conversas Conversa[]
+  tags      Tag[]
+  filtros   Filtro[]
+}
+
+model Membro {
+  id          String   @id @default(cuid())
+  workspaceId String
+  nome        String
+  email       String   @unique
+  papel       Papel    @default(MEMBRO)
+  assinatura  String?
+  criadoEm    DateTime @default(now())
+
+  workspace           Workspace    @relation(fields: [workspaceId], references: [id])
+  caixas              Caixa[]
+  conversasAtribuidas Conversa[]   @relation("Responsavel")
+  mensagensEnviadas   Mensagem[]
+  comentarios         Comentario[]
+}
+
+model Caixa {
+  id                  String   @id @default(cuid())
+  workspaceId         String
+  membroId            String? // dono da caixa no modo CONTAS_CONECTADAS
+  endereco            String   @unique
+  refreshTokenCifrado String
+  historyId           String? // ponto de partida da sincronização incremental
+  conectadaEm         DateTime @default(now())
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id])
+  membro       Membro?       @relation(fields: [membroId], references: [id])
+  recebimentos Recebimento[]
+}
+
+model Conversa {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  assunto       String
+  status        Status   @default(ABERTA)
+  responsavelId String?
+  ultimaMsgEm   DateTime
+
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  responsavel Membro?       @relation("Responsavel", fields: [responsavelId], references: [id])
+  mensagens   Mensagem[]
+  tags        ConversaTag[]
+  comentarios Comentario[]
+
+  @@index([workspaceId, ultimaMsgEm])
+}
+
+model Mensagem {
+  id           String   @id @default(cuid())
+  conversaId   String
+  messageIdRfc String   @unique // cabeçalho Message-ID: evita duplicar entre caixas
+  de           String
+  para         String[]
+  cc           String[]
+  corpoTexto   String?
+  corpoHtml    String?
+  enviadaPorId String? // membro que respondeu pelo app
+  enviadaEm    DateTime
+
+  conversa     Conversa      @relation(fields: [conversaId], references: [id])
+  enviadaPor   Membro?       @relation(fields: [enviadaPorId], references: [id])
+  recebimentos Recebimento[]
+}
+
+// Em quais caixas a mensagem chegou (um email com cópia para João e Maria
+// é uma Mensagem com dois Recebimentos).
+model Recebimento {
+  mensagemId    String
+  caixaId       String
+  gmailMsgId    String
+  gmailThreadId String
+
+  mensagem Mensagem @relation(fields: [mensagemId], references: [id])
+  caixa    Caixa    @relation(fields: [caixaId], references: [id])
+
+  @@id([mensagemId, caixaId])
+}
+
+model Tag {
+  id          String @id @default(cuid())
+  workspaceId String
+  nome        String
+  cor         String @default("#888888")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id])
+  conversas ConversaTag[]
+
+  @@unique([workspaceId, nome])
+}
+
+model ConversaTag {
+  conversaId String
+  tagId      String
+
+  conversa Conversa @relation(fields: [conversaId], references: [id])
+  tag      Tag      @relation(fields: [tagId], references: [id])
+
+  @@id([conversaId, tagId])
+}
+
+model Comentario {
+  id         String   @id @default(cuid())
+  conversaId String
+  membroId   String
+  texto      String
+  criadoEm   DateTime @default(now())
+
+  conversa Conversa @relation(fields: [conversaId], references: [id])
+  membro   Membro   @relation(fields: [membroId], references: [id])
+}
+
+enum TipoFiltro {
+  CATEGORIA_GMAIL // ex.: CATEGORY_PROMOTIONS
+  NEWSLETTER // cabeçalho List-Unsubscribe
+  REMETENTE
+  DOMINIO
+  ASSUNTO_CONTEM
+}
+
+enum AcaoFiltro {
+  IGNORAR
+  APLICAR_TAG
+}
+
+model Filtro {
+  id          String     @id @default(cuid())
+  workspaceId String
+  tipo        TipoFiltro
+  valor       String
+  acao        AcaoFiltro @default(IGNORAR)
+  tagId       String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+}
