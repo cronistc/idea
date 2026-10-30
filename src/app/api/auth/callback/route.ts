@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { trocarCodigo } from "@/lib/google";
 import { iniciarSessao, membroAtual } from "@/lib/sessao";
+import { sincronizarCaixa } from "@/lib/sincronizacao";
 
 export async function GET(req: NextRequest) {
   const voltar = (erro?: string) =>
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   if (state.endsWith(".login")) {
     await iniciarSessao(await entrar(conta.email, conta.nome));
-    return voltar();
+    return NextResponse.redirect(new URL("/caixa", req.url));
   }
 
   // Conectar caixa
@@ -49,11 +50,12 @@ export async function GET(req: NextRequest) {
     refreshTokenCifrado: cifrar(conta.refreshToken),
     historyId: null,
   };
-  await db.caixa.upsert({
+  const caixa = await db.caixa.upsert({
     where: { endereco: conta.email },
     create: { endereco: conta.email, ...dados },
     update: dados,
   });
+  void sincronizarCaixa(caixa.id); // primeira carga em segundo plano
   return voltar();
 }
 
@@ -65,7 +67,26 @@ async function entrar(email: string, nome: string): Promise<string> {
   return db.$transaction(async (tx) => {
     let workspace = await tx.workspace.findFirst({ orderBy: { criadoEm: "asc" } });
     const primeiro = !workspace;
-    workspace ??= await tx.workspace.create({ data: { nome: env.dominioPermitido } });
+    workspace ??= await tx.workspace.create({
+      data: {
+        nome: env.dominioPermitido,
+        // Começa ignorando publicidade, redes sociais e newsletters.
+        filtros: {
+          create: [
+            { tipo: "CATEGORIA_GMAIL", valor: "CATEGORY_PROMOTIONS" },
+            { tipo: "CATEGORIA_GMAIL", valor: "CATEGORY_SOCIAL" },
+            { tipo: "NEWSLETTER", valor: "" },
+          ],
+        },
+        tags: {
+          create: [
+            { nome: "Financeiro", cor: "#16a34a" },
+            { nome: "Urgente", cor: "#dc2626" },
+            { nome: "Suporte", cor: "#2563eb" },
+          ],
+        },
+      },
+    });
     const membro = await tx.membro.create({
       data: { email, nome, workspaceId: workspace.id, papel: primeiro ? "ADMIN" : "MEMBRO" },
     });

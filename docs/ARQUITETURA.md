@@ -62,11 +62,35 @@ Filtro        id, workspace_id, tipo, valor, acao
 - **Sincronização incremental:** `users.history.list` a partir do último
   `history_id` de cada caixa.
 
+## Onde está cada coisa
+
+| Pasta/arquivo | Conteúdo |
+|---|---|
+| `src/lib/gmail.ts` | Chamadas à API do Gmail |
+| `src/lib/leitura.ts` | Converte a mensagem do Gmail (cabeçalhos, corpo, anexos) |
+| `src/lib/ingestao.ts` | Grava a mensagem sem duplicar e escolhe a conversa |
+| `src/lib/sincronizacao.ts` | Carga inicial e incremental de cada caixa |
+| `src/lib/envio.ts` | Regras de quem responde por qual caixa e envio |
+| `src/lib/mime.ts` | Monta o email (acentos, anexos, cabeçalhos de resposta) |
+| `src/lib/filtros.ts` | Filtros de publicidade/newsletter e regras de tag |
+| `src/lib/presenca.ts` | Quem está vendo/respondendo (memória do servidor) |
+| `src/instrumentation.ts` | Agenda a sincronização quando o servidor sobe |
+| `src/app/acoes.ts` | Ações do servidor (status, tags, envio, configurações…) |
+| `src/app/(app)/` | Telas: caixa, conversa, escrever, configurações |
+| `tests/` | Testes automatizados |
+
+## Limitações conhecidas
+
+- A presença ("fulano está respondendo") fica na memória do servidor: funciona
+  com um único processo, que é o caso do uso interno.
+- Encaminhar não reenvia os anexos da mensagem original.
+- Marcar como lida no app não altera o Gmail, e vice-versa.
+
 ## Próximos passos
 
-1. ~~Estrutura do projeto Next.js + Prisma + banco~~ ✅
-2. ~~Login com Google e conexão de caixas~~ ✅
-3. Criar o app OAuth no Google Cloud (ver [SETUP.md](SETUP.md))
-4. Sincronização e caixa de entrada unificada (só leitura)
-5. Responder, tags, status, responsável
-6. Comentários internos, presença e filtros
+1. ~~Estrutura do projeto, login e conexão de caixas~~ ✅
+2. ~~Sincronização, caixa unificada, resposta, tags, status, comentários,
+   presença e filtros~~ ✅
+3. Criar o app OAuth no Google Cloud e testar com as contas reais (ver [SETUP.md](SETUP.md))
+4. Escolher onde hospedar (computador da empresa ou servidor gratuito)
+5. Ideias: respostas prontas, notificações, resumo por IA, relatórios de tempo de resposta

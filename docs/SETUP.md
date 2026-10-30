@@ -41,5 +41,23 @@ npm run dev                   # http://localhost:3000
      próprio Gmail.
 3. Os demais entram com "Entrar com Google" usando a conta da empresa.
 
+Ao conectar uma caixa, o app traz os emails dos últimos 30 dias e depois
+busca novos a cada minuto (ou na hora, pelo botão ⟳ no topo).
+
 Os tokens de acesso ao Gmail ficam cifrados no banco com a `TOKEN_KEY`.
 Guarde essa chave: se ela for perdida, as caixas precisam ser reconectadas.
+
+## 4. Deixar rodando para a equipe
+
+Para uso interno, o mais simples é um computador ou servidor da empresa
+sempre ligado:
+
+```bash
+npm run build
+npm start        # porta 3000
+```
+
+Se os outros acessarem por outro endereço (ex.: `http://192.168.0.10:3000` ou
+um domínio), ajuste `APP_URL` no `.env` e adicione o mesmo endereço +
+`/api/auth/callback` nas URIs de redirecionamento do Google Cloud. Fora da
+rede local, use HTTPS.

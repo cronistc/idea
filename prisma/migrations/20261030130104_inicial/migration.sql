@@ -49,6 +49,8 @@ CREATE TABLE "Caixa" (
     "refreshTokenCifrado" TEXT NOT NULL,
     "historyId" TEXT,
     "conectadaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sincronizadaEm" TIMESTAMP(3),
+    "erroSincronizacao" TEXT,
 
     CONSTRAINT "Caixa_pkey" PRIMARY KEY ("id")
 );
@@ -58,9 +60,11 @@ CREATE TABLE "Conversa" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
     "assunto" TEXT NOT NULL,
+    "trecho" TEXT NOT NULL DEFAULT '',
     "status" "Status" NOT NULL DEFAULT 'ABERTA',
     "responsavelId" TEXT,
     "ultimaMsgEm" TIMESTAMP(3) NOT NULL,
+    "criadaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Conversa_pkey" PRIMARY KEY ("id")
 );
@@ -70,11 +74,15 @@ CREATE TABLE "Mensagem" (
     "id" TEXT NOT NULL,
     "conversaId" TEXT NOT NULL,
     "messageIdRfc" TEXT NOT NULL,
+    "referencias" TEXT[],
+    "assunto" TEXT NOT NULL,
     "de" TEXT NOT NULL,
     "para" TEXT[],
     "cc" TEXT[],
+    "trecho" TEXT NOT NULL DEFAULT '',
     "corpoTexto" TEXT,
     "corpoHtml" TEXT,
+    "anexos" JSONB NOT NULL DEFAULT '[]',
     "enviadaPorId" TEXT,
     "enviadaEm" TIMESTAMP(3) NOT NULL,
 
@@ -89,6 +97,15 @@ CREATE TABLE "Recebimento" (
     "gmailThreadId" TEXT NOT NULL,
 
     CONSTRAINT "Recebimento_pkey" PRIMARY KEY ("mensagemId","caixaId")
+);
+
+-- CreateTable
+CREATE TABLE "Leitura" (
+    "membroId" TEXT NOT NULL,
+    "conversaId" TEXT NOT NULL,
+    "lidaEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Leitura_pkey" PRIMARY KEY ("membroId","conversaId")
 );
 
 -- CreateTable
@@ -145,6 +162,15 @@ CREATE INDEX "Conversa_workspaceId_ultimaMsgEm_idx" ON "Conversa"("workspaceId",
 CREATE UNIQUE INDEX "Mensagem_messageIdRfc_key" ON "Mensagem"("messageIdRfc");
 
 -- CreateIndex
+CREATE INDEX "Mensagem_conversaId_enviadaEm_idx" ON "Mensagem"("conversaId", "enviadaEm");
+
+-- CreateIndex
+CREATE INDEX "Recebimento_caixaId_gmailThreadId_idx" ON "Recebimento"("caixaId", "gmailThreadId");
+
+-- CreateIndex
+CREATE INDEX "Recebimento_caixaId_gmailMsgId_idx" ON "Recebimento"("caixaId", "gmailMsgId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Tag_workspaceId_nome_key" ON "Tag"("workspaceId", "nome");
 
 -- AddForeignKey
@@ -163,31 +189,40 @@ ALTER TABLE "Conversa" ADD CONSTRAINT "Conversa_workspaceId_fkey" FOREIGN KEY ("
 ALTER TABLE "Conversa" ADD CONSTRAINT "Conversa_responsavelId_fkey" FOREIGN KEY ("responsavelId") REFERENCES "Membro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Mensagem" ADD CONSTRAINT "Mensagem_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Mensagem" ADD CONSTRAINT "Mensagem_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Mensagem" ADD CONSTRAINT "Mensagem_enviadaPorId_fkey" FOREIGN KEY ("enviadaPorId") REFERENCES "Membro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Recebimento" ADD CONSTRAINT "Recebimento_mensagemId_fkey" FOREIGN KEY ("mensagemId") REFERENCES "Mensagem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Recebimento" ADD CONSTRAINT "Recebimento_mensagemId_fkey" FOREIGN KEY ("mensagemId") REFERENCES "Mensagem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Recebimento" ADD CONSTRAINT "Recebimento_caixaId_fkey" FOREIGN KEY ("caixaId") REFERENCES "Caixa"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Recebimento" ADD CONSTRAINT "Recebimento_caixaId_fkey" FOREIGN KEY ("caixaId") REFERENCES "Caixa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Leitura" ADD CONSTRAINT "Leitura_membroId_fkey" FOREIGN KEY ("membroId") REFERENCES "Membro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Leitura" ADD CONSTRAINT "Leitura_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Tag" ADD CONSTRAINT "Tag_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ConversaTag" ADD CONSTRAINT "ConversaTag_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ConversaTag" ADD CONSTRAINT "ConversaTag_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ConversaTag" ADD CONSTRAINT "ConversaTag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "Tag"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ConversaTag" ADD CONSTRAINT "ConversaTag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Comentario" ADD CONSTRAINT "Comentario_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Comentario" ADD CONSTRAINT "Comentario_conversaId_fkey" FOREIGN KEY ("conversaId") REFERENCES "Conversa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Comentario" ADD CONSTRAINT "Comentario_membroId_fkey" FOREIGN KEY ("membroId") REFERENCES "Membro"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Filtro" ADD CONSTRAINT "Filtro_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Filtro" ADD CONSTRAINT "Filtro_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;

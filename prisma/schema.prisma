@@ -57,19 +57,22 @@ model Membro {
   conversasAtribuidas Conversa[]   @relation("Responsavel")
   mensagensEnviadas   Mensagem[]
   comentarios         Comentario[]
+  leituras            Leitura[]
 }
 
 model Caixa {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   workspaceId         String
   membroId            String? // dono da caixa no modo CONTAS_CONECTADAS
-  endereco            String   @unique
+  endereco            String    @unique
   refreshTokenCifrado String
   historyId           String? // ponto de partida da sincronização incremental
-  conectadaEm         DateTime @default(now())
+  conectadaEm         DateTime  @default(now())
+  sincronizadaEm      DateTime?
+  erroSincronizacao   String?
 
   workspace    Workspace     @relation(fields: [workspaceId], references: [id])
-  membro       Membro?       @relation(fields: [membroId], references: [id])
+  membro       Membro?       @relation(fields: [membroId], references: [id], onDelete: SetNull)
   recebimentos Recebimento[]
 }
 
@@ -77,15 +80,18 @@ model Conversa {
   id            String   @id @default(cuid())
   workspaceId   String
   assunto       String
+  trecho        String   @default("")
   status        Status   @default(ABERTA)
   responsavelId String?
   ultimaMsgEm   DateTime
+  criadaEm      DateTime @default(now())
 
   workspace   Workspace     @relation(fields: [workspaceId], references: [id])
   responsavel Membro?       @relation("Responsavel", fields: [responsavelId], references: [id])
   mensagens   Mensagem[]
   tags        ConversaTag[]
   comentarios Comentario[]
+  leituras    Leitura[]
 
   @@index([workspaceId, ultimaMsgEm])
 }
@@ -94,17 +100,23 @@ model Mensagem {
   id           String   @id @default(cuid())
   conversaId   String
   messageIdRfc String   @unique // cabeçalho Message-ID: evita duplicar entre caixas
-  de           String
+  referencias  String[] // In-Reply-To + References, para agrupar em conversas
+  assunto      String
+  de           String // "Nome <email>"
   para         String[]
   cc           String[]
+  trecho       String   @default("")
   corpoTexto   String?
   corpoHtml    String?
+  anexos       Json     @default("[]") // [{ nome, tipo, tamanho, gmailAnexoId }]
   enviadaPorId String? // membro que respondeu pelo app
   enviadaEm    DateTime
 
-  conversa     Conversa      @relation(fields: [conversaId], references: [id])
+  conversa     Conversa      @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   enviadaPor   Membro?       @relation(fields: [enviadaPorId], references: [id])
   recebimentos Recebimento[]
+
+  @@index([conversaId, enviadaEm])
 }
 
 // Em quais caixas a mensagem chegou (um email com cópia para João e Maria
@@ -115,10 +127,24 @@ model Recebimento {
   gmailMsgId    String
   gmailThreadId String
 
-  mensagem Mensagem @relation(fields: [mensagemId], references: [id])
-  caixa    Caixa    @relation(fields: [caixaId], references: [id])
+  mensagem Mensagem @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
+  caixa    Caixa    @relation(fields: [caixaId], references: [id], onDelete: Cascade)
 
   @@id([mensagemId, caixaId])
+  @@index([caixaId, gmailThreadId])
+  @@index([caixaId, gmailMsgId])
+}
+
+// Quando cada membro viu a conversa pela última vez (para negrito de não lida).
+model Leitura {
+  membroId   String
+  conversaId String
+  lidaEm     DateTime
+
+  membro   Membro   @relation(fields: [membroId], references: [id], onDelete: Cascade)
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+
+  @@id([membroId, conversaId])
 }
 
 model Tag {
@@ -129,6 +155,7 @@ model Tag {
 
   workspace Workspace     @relation(fields: [workspaceId], references: [id])
   conversas ConversaTag[]
+  filtros   Filtro[]
 
   @@unique([workspaceId, nome])
 }
@@ -137,8 +164,8 @@ model ConversaTag {
   conversaId String
   tagId      String
 
-  conversa Conversa @relation(fields: [conversaId], references: [id])
-  tag      Tag      @relation(fields: [tagId], references: [id])
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([conversaId, tagId])
 }
@@ -150,7 +177,7 @@ model Comentario {
   texto      String
   criadoEm   DateTime @default(now())
 
-  conversa Conversa @relation(fields: [conversaId], references: [id])
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   membro   Membro   @relation(fields: [membroId], references: [id])
 }
 
@@ -176,4 +203,5 @@ model Filtro {
   tagId       String?
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
+  tag       Tag?      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 }
